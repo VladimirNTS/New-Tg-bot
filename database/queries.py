@@ -8,6 +8,9 @@ from database.models import Banner, Cart, Category, Product, User
 
 # Пагинатор
 class Paginator:
+    '''
+    Пагинатор для инлайн меню - для управления перелистыванием товаров в меню и корзине
+    '''
     def __init__(self, array: list | tuple, page: int=1, per_page: int=1):
         self.array = array
         self.per_page = per_page
@@ -50,7 +53,7 @@ class Paginator:
 # Работа с баннерами (информационными страницами)
 
 async def orm_add_banner_description(session: AsyncSession, data: dict):
-    '''Добавление и редактирование названий и описаний банеров для меню, корзины и тд.
+    '''Добавление новых банеров для меню, корзины и тд.
     
     Args:
         session: Ассинхронная сессия sqlalchemy
@@ -66,18 +69,34 @@ async def orm_add_banner_description(session: AsyncSession, data: dict):
 
 
 async def orm_change_banner_image(session: AsyncSession, name: str, image: str):
+    '''Изменение изображения для банера
+    
+    Args:
+        session: Ассинхронная сессия sqlalchemy
+        name: имя банера названия которого нужно поменять
+        image: id изображения телеграм
+    '''
     query = update(Banner).where(Banner.name == name).values(image=image)
     await session.execute(query)
     await session.commit()
 
 
 async def orm_get_banner(session: AsyncSession, page: str):
+    '''Получение данные банера по имени. Возвращает имя, описание, id изображения
+    
+    session: Ассинхронная сессия sqlalchemy
+    page: имя банера
+    '''
     query = select(Banner).where(Banner.name == page)
     result = await session.execute(query)
     return result.scalar()
 
 
 async def orm_get_info_pages(session: AsyncSession):
+    '''Возвращает все банеры
+    
+    session: Ассинхроная сессия sqlalchemy
+    '''
     query = select(Banner)
     result = await session.execute(query)
     return result.scalars().all()
@@ -85,11 +104,20 @@ async def orm_get_info_pages(session: AsyncSession):
 
 # Категории
 async def orm_get_categories(session: AsyncSession):
+    '''Возвращает список категорий
+    
+    session: Ассинхроная сессия sqlalchemy
+    '''
     query = select(Category)
     result = await session.execute(query)
     return result.scalars().all()
 
 async def orm_create_categories(session: AsyncSession, categories: list):
+    '''Создать категорию
+    
+    session: Ассинхроная сессия sqlalchemy
+    categories: Список категорий, которое необходимо создать
+    '''
     query = select(Category)
     result = await session.execute(query)
     if result.first():
@@ -100,6 +128,11 @@ async def orm_create_categories(session: AsyncSession, categories: list):
 
 # Админка: добавить/изменить/удалить товар
 async def orm_add_product(session: AsyncSession, data: dict):
+    '''Создание нового продукта в базе данных
+    
+    session: Ассинхроная сессия sqlalchemy
+    data: даннае необходимые для создания товара {name, description, price, image, category}
+    '''
     obj = Product(
         name=data["name"],
         description=data["description"],
@@ -112,12 +145,18 @@ async def orm_add_product(session: AsyncSession, data: dict):
 
 
 async def orm_get_products(session: AsyncSession, category_id):
+    '''Возвращает все товары из базы по id категории
+    
+    session: Ассинхроная сессия sqlalchemy
+    category_id: Айди категории с товарами
+    '''
     query = select(Product).where(Product.category_id == int(category_id))
     result = await session.execute(query)
     return result.scalars().all()
 
 
 async def orm_get_product(session: AsyncSession, product_id: int):
+    
     query = select(Product).where(Product.id == product_id)
     result = await session.execute(query)
     return result.scalar()

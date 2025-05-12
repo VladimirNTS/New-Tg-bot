@@ -17,6 +17,8 @@ class User(Base):
 
 
 class Admin:
+    '''Администраторы бота
+    '''
     __tablename__ = 'admin'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

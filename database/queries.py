@@ -3,7 +3,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from database.models import Banner, Cart, Category, Product, User
+from database.models import Banner, Cart, Category, Product, User, Admin
 
 
 # Пагинатор
@@ -156,13 +156,23 @@ async def orm_get_products(session: AsyncSession, category_id):
 
 
 async def orm_get_product(session: AsyncSession, product_id: int):
+    '''Возвращает товар из базы по id товара
     
+    session: Ассинхроная сессия sqlalchemy
+    product_id: Айди товара
+    '''
     query = select(Product).where(Product.id == product_id)
     result = await session.execute(query)
     return result.scalar()
 
 
 async def orm_update_product(session: AsyncSession, product_id: int, data):
+    '''Изменяет товар по его id
+    
+    session: Ассинхроная сессия sqlalchemy
+    product_id: Айди товара
+    data: Новые данные для товара
+    '''
     query = (
         update(Product)
         .where(Product.id == product_id)
@@ -179,6 +189,7 @@ async def orm_update_product(session: AsyncSession, product_id: int, data):
 
 
 async def orm_delete_product(session: AsyncSession, product_id: int):
+    
     query = delete(Product).where(Product.id == product_id)
     await session.execute(query)
     await session.commit()
@@ -191,7 +202,9 @@ async def orm_add_user(
     first_name: str | None = None,
     last_name: str | None = None,
     phone: str | None = None,
-):
+) -> None:
+    '''Добавляет пользователя если его нет
+    '''
     query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
     if result.first() is None:
@@ -202,7 +215,7 @@ async def orm_add_user(
 
 
 # Корзина
-async def orm_add_to_cart(session: AsyncSession, user_id: int, product_id: int):
+async def orm_add_to_cart(session: AsyncSession, user_id: int, product_id: int) -> tuple:
     query = select(Cart).where(Cart.user_id == user_id, Cart.product_id == product_id).options(joinedload(Cart.product))
     cart = await session.execute(query)
     cart = cart.scalar()
@@ -245,4 +258,20 @@ async def orm_reduce_product_in_cart(session: AsyncSession, user_id: int, produc
         return False
 
 
+# Работа с администраторами
+async def orm_add_admin(session, user_id):
+    '''Добавить нового администратора в таблицу'''
+    session.add(
+        Admin(
+            user_id=user_id
+        )
+    )
+    await session.commit()
+
+
+async def orm_delete_admin(session, user_id):
+    '''Удалить администратора из таблицы'''
+    query = delete(Admin).where(user_id==user_id)
+    await session.execute(query)
+    await session.commit()
 

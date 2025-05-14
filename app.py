@@ -7,7 +7,8 @@ load_dotenv()
 
 from handlers.user_private import user_private_router
 from handlers.admin_private import admin_private_router
-from database.engine import create_db
+from database.engine import session, create_db
+from middlewares.db_session import DataBaseSession
 
 
 bot = Bot(token=os.getenv('TOKEN'))
@@ -24,6 +25,7 @@ async def on_startup():
 
 async def main():
     dp.startup.register(on_startup)
+    dp.update.middleware.register(DataBaseSession(session_pool=session))
 
     await dp.start_polling(bot)
 

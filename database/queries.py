@@ -112,6 +112,7 @@ async def orm_get_categories(session: AsyncSession):
     result = await session.execute(query)
     return result.scalars().all()
 
+
 async def orm_create_categories(session: AsyncSession, categories: list):
     '''Создать категорию
     
@@ -123,6 +124,17 @@ async def orm_create_categories(session: AsyncSession, categories: list):
     if result.first():
         return
     session.add_all([Category(name=name) for name in categories]) 
+    await session.commit()
+
+
+async def orm_edit_category(session: AsyncSession, category_id, name):
+    '''изменить категорию
+    
+    session: Ассинхроная сессия sqlalchemy
+    categor_id: id категории
+    '''
+    query = update(Category).where(Category.id == category_id).values(name=name)
+    await session.execute(query)
     await session.commit()
 
 

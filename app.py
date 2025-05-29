@@ -2,6 +2,8 @@ import os
 
 import asyncio
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -11,7 +13,7 @@ from database.engine import session, create_db
 from middlewares.db_session import DataBaseSession
 
 
-bot = Bot(token=os.getenv('TOKEN'))
+bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
 

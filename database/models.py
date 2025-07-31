@@ -13,7 +13,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
     name: Mapped[str] = mapped_column(String(50), nullable=True)
-    phone: Mapped[str]  = mapped_column(String(13), nullable=True)
+    tun_id: Mapped[str]  = mapped_column(String(13), nullable=True)
+    status: Mapped[int] = mapped_column(BigInteger())
 
 
 class Admin:

@@ -14,62 +14,32 @@ class User(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
     name: Mapped[str] = mapped_column(String(50), nullable=True)
     tun_id: Mapped[str]  = mapped_column(String(13), nullable=True)
-    status: Mapped[int] = mapped_column(BigInteger())
+    status: Mapped[int] = mapped_column(BigInteger)
+    sub_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
 
 
 class Admin:
     '''Администраторы бота
     '''
-    __tablename__ = 'admin'
+    __tablename__ = 'admins'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
 
 
-class Category(Base):
-    __tablename__ = 'category'
+class Tariff(Base):
+    __tablename__ = 'tariffs'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    sub_time: Mapped[int] = mapped_column(BigInteger)
+    price: Mapped[int] = mapped_column(Numeric(5, 2), nullable=False)
 
 
-class Product(Base):
-    __tablename__ = 'product'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    description: Mapped[str] = mapped_column(Text)
-    price: Mapped[float] = mapped_column(Numeric(5,2), nullable=False)
-    image: Mapped[str] = mapped_column(String(150))
-    category_id: Mapped[int] = mapped_column(ForeignKey('category.id', ondelete='CASCADE'), nullable=False)
-
-    category: Mapped['Category'] = relationship(backref='product')
-
-
-class Banner(Base):
-    __tablename__ = 'banner'
+class FAQ(Base):
+    __tablename__ = 'faq'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(15), unique=True)
-    image: Mapped[str] = mapped_column(String(150), nullable=True)
-    description: Mapped[str] = mapped_column(Text, nullable=True)
-
-
-class Cart(Base):
-    __tablename__ = 'cart'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('user.user_id', ondelete='CASCADE'), nullable=False)
-    product_id: Mapped[int] = mapped_column(ForeignKey('product.id', ondelete='CASCADE'), nullable=False)
-    quantity: Mapped[int]
-
-    user: Mapped['User'] = relationship(backref='cart')
-    product: Mapped['Product'] = relationship(backref='cart')
-
-
-class Order(Base):
-    __tablename__ = 'order'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
+    ask: Mapped[str] = mapped_column(String(50), nullable=False)
+    answer: Mapped[str]  = mapped_column(Text, nullable=False)
 

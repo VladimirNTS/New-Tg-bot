@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, func, String, BigInteger, Text, Numeric, ForeignKey
+from sqlalchemy import DateTime, func, String, BigInteger, Text, Numeric, ForeignKey, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -16,6 +16,8 @@ class User(Base):
     tun_id: Mapped[str]  = mapped_column(String(13), nullable=True)
     status: Mapped[int] = mapped_column(BigInteger)
     sub_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    invited_users: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Admin:

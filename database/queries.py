@@ -3,7 +3,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from databare.models import Tariff, User, Admin
+from database.models import Tariff, User, Admin
 
 
 # Tariffs
@@ -28,71 +28,25 @@ async def orm_edit_tariff(session: AsyncSession, tariff_id, name, sub_time, pric
     await session.commit()
 
 
-# Админка: добавить/изменить/удалить товар
-async def orm_add_product(session: AsyncSession, data: dict):
-    '''Создание нового продукта в базе данных
-    
-    session: Ассинхроная сессия sqlalchemy
-    data: даннае необходимые для создания товара {name, description, price, image, category}
-    '''
-    obj = Product(
+async def orm_add_tariff(session: AsyncSession, data: dict):
+    obj = Tariff(
         name=data["name"],
-        description=data["description"],
+        sub_time=data["sub_time"],
         price=float(data["price"]),
-        image=data["image"],
-        category_id=int(data["category"]),
     )
     session.add(obj)
     await session.commit()
 
 
-async def orm_get_products(session: AsyncSession, category_id):
-    '''Возвращает все товары из базы по id категории
-    
-    session: Ассинхроная сессия sqlalchemy
-    category_id: Айди категории с товарами
-    '''
-    query = select(Product).where(Product.category_id == int(category_id))
-    result = await session.execute(query)
-    return result.scalars().all()
-
-
-async def orm_get_product(session: AsyncSession, product_id: int):
-    '''Возвращает товар из базы по id товара
-    
-    session: Ассинхроная сессия sqlalchemy
-    product_id: Айди товара
-    '''
-    query = select(Product).where(Product.id == product_id)
+async def orm_get_tariff(session: AsyncSession, tariff_id: int):
+    query = select(Tariff).where(Tariff.id == tariff_id)
     result = await session.execute(query)
     return result.scalar()
 
 
-async def orm_update_product(session: AsyncSession, product_id: int, data):
-    '''Изменяет товар по его id
+async def orm_delete_tariff(session: AsyncSession, tariff_id: int):
     
-    session: Ассинхроная сессия sqlalchemy
-    product_id: Айди товара
-    data: Новые данные для товара
-    '''
-    query = (
-        update(Product)
-        .where(Product.id == product_id)
-        .values(
-            name=data["name"],
-            description=data["description"],
-            price=float(data["price"]),
-            image=data["image"],
-            category_id=int(data["category"]),
-        )
-    )
-    await session.execute(query)
-    await session.commit()
-
-
-async def orm_delete_product(session: AsyncSession, product_id: int):
-    
-    query = delete(Product).where(Product.id == product_id)
+    query = delete(Tariff).where(Tariff.id == tariff_id)
     await session.execute(query)
     await session.commit()
 
@@ -101,9 +55,7 @@ async def orm_delete_product(session: AsyncSession, product_id: int):
 async def orm_add_user(
     session: AsyncSession,
     user_id: int,
-    first_name: str | None = None,
-    last_name: str | None = None,
-    phone: str | None = None,
+    name: str | None = None,
 ) -> None:
     '''Добавляет пользователя если его нет
     '''
@@ -111,53 +63,46 @@ async def orm_add_user(
     result = await session.execute(query)
     if result.first() is None:
         session.add(
-            User(user_id=user_id, first_name=first_name, last_name=last_name, phone=phone)
+            User(user_id=user_id, name=name, status=0)
         )
         await session.commit()
 
 
-# Корзина
-async def orm_add_to_cart(session: AsyncSession, user_id: int, product_id: int) -> tuple:
-    query = select(Cart).where(Cart.user_id == user_id, Cart.product_id == product_id).options(joinedload(Cart.product))
-    cart = await session.execute(query)
-    cart = cart.scalar()
-    if cart:
-        cart.quantity += 1
-        await session.commit()
-        return cart
-    else:
-        session.add(Cart(user_id=user_id, product_id=product_id, quantity=1))
-        await session.commit()
-
-
-
-async def orm_get_user_carts(session: AsyncSession, user_id):
-    query = select(Cart).filter(Cart.user_id == user_id).options(joinedload(Cart.product))
-    result = await session.execute(query)
-    return result.scalars().all()
-
-
-async def orm_delete_from_cart(session: AsyncSession, user_id: int, product_id: int):
-    query = delete(Cart).where(Cart.user_id == user_id, Cart.product_id == product_id)
+async def orm_change_user_status(session: AsyncSession, user_id, new_status, sub_time, tun_id):
+    
+    query = update(User).where(User.id == user_id).values(
+            status=new_status,
+            sub_time=sub_time,
+            tun_id=tun_id
+        )
     await session.execute(query)
     await session.commit()
 
 
-async def orm_reduce_product_in_cart(session: AsyncSession, user_id: int, product_id: int):
-    query = select(Cart).where(Cart.user_id == user_id, Cart.product_id == product_id).options(joinedload(Cart.product))
-    cart = await session.execute(query)
-    cart = cart.scalar()
+async def orm_get_users(session: AsyncSession):
+    '''Возвращает список пользвателей
+    
+    session: Ассинхроная сессия sqlalchemy
+    '''
+    query = select(User)
+    result = await session.execute(query)
+    return result.scalars().all()
 
-    if not cart:
-        return
-    if cart.quantity > 1:
-        cart.quantity -= 1
-        await session.commit()
-        return True
-    else:
-        await orm_delete_from_cart(session, user_id, product_id)
-        await session.commit()
-        return False
+
+async def orm_get_blocked_users(session: AsyncSession):
+    '''Возвращает список пользвателей
+    
+    session: Ассинхроная сессия sqlalchemy
+    '''
+    query = select(User).where(User.blocked == True)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def orm_get_user(session: AsyncSession, user_id: int):
+    query = select(User).where(User.id == user_id)
+    result = await session.execute(query)
+    return result.scalar()
 
 
 # Работа с администраторами

@@ -326,7 +326,6 @@ async def delete_faq(callback_query: types.CallbackQuery, session):
     await callback_query.message.delete()
 
 
-# Write an FSM for sending messages to users. It should ask the user for the message to be sent, request a picture if needed, and inquire whom to send it to: only active subscribers or everyone including "guests". Guests are those whose status in the database is 0. Active subscribers are those whose status is 1 or higher.
 class FSMSendMessages(StatesGroup):
     message = State()
     picture = State()
@@ -373,11 +372,12 @@ async def send_messages_active_subscribers(callback: types.CallbackQuery, state:
 @admin_private_router.callback_query(StateFilter(None), F.data == "orders_list")
 async def orders_list(callback: types.CallbackQuery, session):
     await callback.answer()
-    message_text = "<"
+    message_text = "<b>Заказы</b>"
     orders = await orm_get_users(session)
     for order in orders:
-        await callback.message.answer(
-            text=f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> {order.status}\n<b>Дата создания:</b> {order.created}\n<b>Дата обновления:</b> {order.updated}",
+        message_text += f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> order{order.status}\n"
+    await callback.message.answer(
+            text=message_text,
             reply_markup=get_callback_btns(btns={'Удалить': f'deleteorder_{order.user_id}'})
         )
 

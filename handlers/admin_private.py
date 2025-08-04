@@ -7,10 +7,17 @@ from kbds.inline import get_callback_btns
 from filters.users_filter import OwnerFilter
 from database.queries import (
     orm_get_users,
+    orm_get_subscribers,
+    orm_block_user,
     orm_get_tariffs,
     orm_add_tariff,
     orm_delete_tariff,
-    orm_edit_tariff
+    orm_edit_tariff,
+    orm_add_faq,
+    orm_get_faq,
+    orm_get_faq_by_id,
+    orm_delete_faq,
+    orm_edit_faq
 )
 
 admin_private_router = Router()
@@ -35,7 +42,7 @@ async def choose_category(callback_query: types.CallbackQuery, session):
 
     for tariff in tariff_list:
         await callback_query.message.answer(
-            text=f"<b>Имя:</b> {tariff.name}\n<b>Срок:</b> {tariff.sub_time} дней\n<b>Цена:</b> {tariff.price}\n<b>ID для оплаты:</b> {tariff.pay_id}", 
+            text=f"<b>Имя:</b> {tariff.name}\n<b>Срок:</b> {tariff.sub_time} месяцев\n<b>Цена:</b> {tariff.price}\n<b>ID для оплаты:</b> {tariff.pay_id}", 
             reply_markup=get_callback_btns(btns={'Изменить': f'edittariff_{tariff.id}', 'Удалить': f'deletetariff_{tariff.id}'})
         )
     
@@ -58,6 +65,39 @@ class FSMAddTariff(StatesGroup):
     price = State()
     pay_id = State()
 
+# Undo text for add tariff FSM
+FSMAddTariff_undo_text = {
+    'FSMAddTariff:name': 'Введите название тарифа заново',
+    'FSMAddTariff:sub_time': 'Введите время подписки (в днях) заново',
+    'FSMAddTariff:price': 'Введите цену подписки заново',
+    'FSMAddTariff:pay_id': 'Введите ссылку для оплаты заново',
+}
+
+# Cancel handler for FSMAddTariff
+@admin_private_router.message(StateFilter("*"), F.text.in_({'/отмена', 'отмена'}))
+async def cancel_fsm_add_tariff(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        return
+    await state.clear()
+    await message.answer('❌ Добавление тарифа отменено')
+
+# Back handler for FSMAddTariff
+@admin_private_router.message(StateFilter('FSMAddTariff'), F.text.in_({'/назад', 'назад'}))
+async def back_step_add_tariff(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == FSMAddTariff.name.state:
+        await message.answer('Предыдущего шага нет, введите название тарифа или напишите "отмена"')
+        return
+    previous = None
+    for step in FSMAddTariff.all_states:
+        if step.state == current_state:
+            if previous is not None:
+                await state.set_state(previous.state)
+                await message.answer(f"Ок, вы вернулись к прошлому шагу. {FSMAddTariff_undo_text[previous.state]}")
+            return
+        previous = step
+
 
 @admin_private_router.callback_query(StateFilter(None), F.data == "addtariff")
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
@@ -73,7 +113,7 @@ async def add_product_description(message: types.Message, state: FSMContext):
     else:
         await state.update_data(name=message.text)
     
-    await message.answer('Введите время подписки (в днях):')
+    await message.answer('Введите время подписки (в месяцах):')
     await state.set_state(FSMAddTariff.sub_time)
 
 
@@ -84,7 +124,7 @@ async def add_product_description(message: types.Message, state: FSMContext):
         await message.answer('Введите цену подписки:')
         await state.set_state(FSMAddTariff.price)
     except:
-         await message.answer('Неверный формат. Введите время подписки (в днях) еще раз:')
+         await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
 
 
 @admin_private_router.message(FSMAddTariff.price)
@@ -116,195 +156,238 @@ async def delete_product(callback_query: types.CallbackQuery, session):
 
 
 # Редактирование тарифа
-class FSMEditCategory(StatesGroup):
+class FSMEditTariff(StatesGroup):
     name = State()
     sub_time = State()
     price = State()
     pay_id = State()
 
 
-@admin_private_router.callback_query(StateFilter(None), F.data == "addtariff")
+@admin_private_router.callback_query(StateFilter(None), F.data.startswith("edittariff"))
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(tariff_id=callback.data.split('_')[-1])
     await callback.answer()
-    await callback.message.answer('Введите название тарифа(необязательно, введите . чтобы пропустить):')
-    await state.set_state(FSMAddTariff.name)
+    await callback.message.answer('Вы создаете новый тариф. Для отмены напишите /отмена или /назад')
+    await callback.message.answer('Введите новое название тарифа(необязательно, введите . чтобы пропустить):')
+    await state.set_state(FSMEditTariff.name)
 
 
-@admin_private_router.message(FSMAddTariff.name)
-async def add_product_description(message: types.Message, state: FSMContext):
+@admin_private_router.message(FSMEditTariff.name)
+async def edit_tariff_name(message: types.Message, state: FSMContext):
     if message.text == '.':
-        await state.update_data(name='')
+        await state.update_data(name=None)
     else:
         await state.update_data(name=message.text)
-    
-    await message.answer('Введите время подписки (в днях):')
-    await state.set_state(FSMAddTariff.sub_time)
+    await message.answer('Введите новое время подписки (в месяцах) (или . чтобы пропустить):')
+    await state.set_state(FSMEditTariff.sub_time)
 
-
-@admin_private_router.message(FSMAddTariff.sub_time)
-async def add_product_description(message: types.Message, state: FSMContext):
+@admin_private_router.message(FSMEditTariff.sub_time)
+async def edit_tariff_sub_time(message: types.Message, state: FSMContext):
+    if message.text == '.':
+        await state.update_data(sub_time=None)
+        await message.answer('Введите новую цену подписки (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.price)
+        return
     try:
         await state.update_data(sub_time=int(message.text))
-        await message.answer('Введите цену подписки:')
-        await state.set_state(FSMAddTariff.price)
+        await message.answer('Введите новую цену подписки (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.price)
     except:
-         await message.answer('Неверный формат. Введите время подписки (в днях) еще раз:')
+        await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
 
-
-@admin_private_router.message(FSMAddTariff.price)
-async def add_product_description(message: types.Message, state: FSMContext):
+@admin_private_router.message(FSMEditTariff.price)
+async def edit_tariff_price(message: types.Message, state: FSMContext):
+    if message.text == '.':
+        await state.update_data(price=None)
+        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.pay_id)
+        return
     try:
         await state.update_data(price=int(message.text))
-        await message.answer('Введите ссылку для оплаты:')
-        await state.set_state(FSMAddTariff.pay_id)
+        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.pay_id)
     except:
-         await message.answer('Неверный формат. Введите цену еще раз:')
+        await message.answer('Неверный формат. Введите цену еще раз:')
 
-
-@admin_private_router.message(FSMEditCategory.name, F.text)
-async def edit_category(message: types.Message, state: FSMContext, session):
-    category_id = await state.get_data()
-    await message.answer(f"✅ Название категории измененно на {message.text}")
-    await orm_edit_tariff(session=session, category_id=category_id['category_id'], name=message.text)
-
+@admin_private_router.message(FSMEditTariff.pay_id)
+async def edit_tariff_pay_id(message: types.Message, state: FSMContext, session):
+    if message.text == '.':
+        await state.update_data(pay_id=None)
+    else:
+        await state.update_data(pay_id=message.text.split('=')[-1])
+    data = await state.get_data()
+    # Оставляем только те поля, которые не None
+    update_fields = {k: v for k, v in data.items() if v is not None}
+    del update_fields['tariff_id']
+    await message.answer('✅ Тариф изменен')
+    await orm_edit_tariff(session=session, tariff_id=data['tariff_id'], fields=update_fields)
     await state.clear()
 
 
-# # Получить список товара
-# @admin_private_router.callback_query(F.data == 'products_list')
-# async def choose_category(callback_query: types.CallbackQuery, session):
-#     await callback_query.answer()
-#     category_list = await orm_get_categories(session)
-
-#     await callback_query.message.answer(
-#         text='Выберите категорию:', 
-#         reply_markup=get_callback_btns(btns={str(i.name): 'category_'+str(i.id) for i in category_list})
-#     )
-
-
-# @admin_private_router.callback_query(F.data.startswith('category_'))
-# async def send_products_list(callback_query: types.CallbackQuery, session):
-#     await callback_query.answer()
-#     products_list = await orm_get_products(session, callback_query.data.split('_')[-1])
-
-#     for product in products_list:
-#         await callback_query.message.answer_photo(
-#             photo=product.image, 
-#             caption=f"<b>Имя:</b> {product.name}\n<b>Описание:</b> {product.description}\n\n<b>Цена:</b> {product.price}",
-#             reply_markup=get_callback_btns(btns={'Изменить': f'editproduct_{product.id}', 'Удалить': f'deleteproduct_{product.id}'})
-#             )
-
-#     await callback_query.message.answer("✅ Вот список товаров ⬆️")
-
-
-# # Удаление товара
-# @admin_private_router.callback_query(StateFilter('*'), F.data.startswith('deleteproduct_'))
-# async def delete_product(callback_query: types.CallbackQuery, session):
-#     await callback_query.answer()
-#     await orm_delete_product(session, callback_query.data.split('_')[-1])
-#     await callback_query.message.answer("✅ Товар удален")
-#     await callback_query.message.delete()
-
-
-# # Хендлер для отлова отмены FSM
-# @admin_private_router.message(StateFilter('*'), Command('отмена'))
-# async def CanselFSM(message: types.Message, state: FSMContext):
-#     currant_state = state.get_state()
-#     if currant_state == None:
-#         return
+# FAQ
+@admin_private_router.callback_query(F.data == 'edit_faq')
+async def edit_faq(callback: types.CallbackQuery, state: FSMContext, session):
     
-#     await state.clear()
-#     await message.answer('❌ Действия отменены')
+    await callback.answer()
+    faq_list = await orm_get_faq(session)
+    for faq in faq_list:
+        await callback.message.answer(
+            text=f"<b>Вопрос:</b> {faq.ask}\n<b>Ответ:</b> {faq.answer}",
+            reply_markup=get_callback_btns(btns={'Изменить': f'editfaq_{faq.id}', 'Удалить': f'deletefaq_{faq.id}'})
+        )
+    if faq_list:
+        await callback.message.answer(
+                text="Вот список вопросов ⬆",
+                reply_markup=get_callback_btns(btns={'Добавить новый вопрос': f'addfaq'})
+            )
+    else:
+        await callback.message.answer(
+                text="Вопросов пока нет",
+                reply_markup=get_callback_btns(btns={'Добавить новый вопрос': f'addfaq'})
+            )
 
 
+# FSM для добавления вопросов
+class FSMAddFAQ(StatesGroup):
+    ask = State()
+    answer = State()
 
 
+@admin_private_router.callback_query(StateFilter(None), F.data == "addfaq")
+async def add_faq(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer('Введите вопрос:')
+    await state.set_state(FSMAddFAQ.ask)
 
 
-# # FSM для добавления товара
-# class FSMAddProduct(StatesGroup):
-#     name = State()
-#     description = State()
-#     price = State()
-#     image = State()
-#     category_id = State()
-
-#     undo_text = {
-# 		'FSMAddProduct:name': 'Введите название заного',
-#         'FSMAddProduct:description': 'Введите описание заного',
-# 		'FSMAddProduct:price': 'Введите цену заного',
-#         'FSMAddProduct:image': 'Пришлите изображение заного',
-#         'FSMAddProduct:category_id': 'Выберите категорию заного',
-#     }
+@admin_private_router.message(FSMAddFAQ.ask)
+async def add_faq_description(message: types.Message, state: FSMContext):
+    await state.update_data(ask=message.text)
+    await message.answer('Введите ответ:')
+    await state.set_state(FSMAddFAQ.answer)
 
 
-# @admin_private_router.message(StateFilter('FSMAddProduct'), Command("назад"))
-# async def back_step_handler(message: types.Message, state: FSMContext) -> None:
-#     '''Шаг назад'''
-
-#     current_state = await state.get_state()
-
-#     if current_state == FSMAddProduct.name:
-#         await message.answer('Предидущего шага нет, или введите название товара или напишите "отмена"')
-#         return
-
-#     previous = None
-#     for step in FSMAddProduct.all_states:
-#         if step.state == current_state:
-#             await state.set_state(previous)
-#             await message.answer(f"Ок, вы вернулись к прошлому шагу \n {FSMAddProduct.undo_text[previous.state]}")
-#             return
-#         previous = step
+@admin_private_router.message(FSMAddFAQ.answer)
+async def add_faq_description(message: types.Message, state: FSMContext, session):
+    await state.update_data(answer=message.text)
+    await message.answer('✅ Вопрос добавлен')
+    data = await state.get_data()
+    await orm_add_faq(session=session, data=data)
+    await state.clear()
 
 
-# @admin_private_router.callback_query(StateFilter(None), F.data == "add_product")
-# async def add_product(callback: types.CallbackQuery, state: FSMContext):
-#     await callback.answer()
-#     await callback.message.answer('<b>Добавление товара</b>\nДля отмены пишите: /отмена \nЧтобы сделать шаг назад пишите: /назад \n\nВведите название товара:')
-#     await state.set_state(FSMAddProduct.name)
+# FSM изменения вопросов
+class FSMEditFAQ(StatesGroup):
+    id = State()
+    ask = State()
+    answer = State()
 
 
-# @admin_private_router.message(FSMAddProduct.name)
-# async def add_product_name(message: types.Message, state: FSMContext):
-#     await state.update_data(name=message.text)
-#     await message.answer('Введите описание товара:')
-#     await state.set_state(FSMAddProduct.description)
+@admin_private_router.callback_query(StateFilter(None), F.data.startswith("editfaq"))
+async def edit_faq(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(faq_id=callback.data.split('_')[-1])
+    await callback.answer()
+    await callback.message.answer('Вы редактируете вопрос. Для отмены напишите /отмена или /назад')
+    await callback.message.answer('Введите новый вопрос, для пропуска напишите ".":')
+    await state.set_state(FSMEditFAQ.ask)
 
 
-# @admin_private_router.message(FSMAddProduct.description)
-# async def add_product_description(message: types.Message, state: FSMContext):
-#     await state.update_data(description=message.text)
-#     await message.answer('Введите цену товара:')
-#     await state.set_state(FSMAddProduct.price)
+@admin_private_router.message(FSMEditFAQ.ask)
+async def edit_faq_name(message: types.Message, state: FSMContext):
+    if message.text == '.':
+        await state.update_data(ask=None)
+    else:
+        await state.update_data(ask=message.text)
+    await message.answer('Введите новый ответ, для пропуска напишите ".":')
+    await state.set_state(FSMEditFAQ.answer)
 
 
-# @admin_private_router.message(FSMAddProduct.price)
-# async def add_product_price(message: types.Message, state: FSMContext):
-#     try:
-#         await state.update_data(price=float(message.text))
-#         await message.answer('Пришлите изображение товара:')
-#         await state.set_state(FSMAddProduct.image)
-#     except:
-#          await message.answer("Вы ввели не число, попробуйте ещё раз:")
+@admin_private_router.message(FSMEditFAQ.answer)
+async def edit_faq_description(message: types.Message, state: FSMContext, session):
+    if message.text == '.':
+        await state.update_data(answer=None)
+    else:
+        await state.update_data(answer=message.text)
+    data = await state.get_data()
+    # Оставляем только те поля, которые не None
+    update_fields = {k: v for k, v in data.items() if v is not None}
+    del update_fields['faq_id']
+    await message.answer('✅ Вопрос изменен')
+    await orm_edit_faq(session=session, id=data['faq_id'], fields=update_fields)
+    await state.clear()
 
 
-# @admin_private_router.message(FSMAddProduct.image, F.photo)
-# async def add_product_image(message: types.Message, state: FSMContext, session):
-#     await state.update_data(image=message.photo[-1].file_id)
-#     categories = await orm_get_categories(session=session)
-#     await message.answer('Выберите категорию:', reply_markup=get_callback_btns(btns={str(i.name): str(i.id) for i in categories}))
-#     await state.set_state(FSMAddProduct.category_id)
+# Удаление вопроса
+@admin_private_router.callback_query(F.data.startswith('deletefaq_'))
+async def delete_faq(callback_query: types.CallbackQuery, session):
+    await callback_query.answer()
+    await orm_delete_faq(session, callback_query.data.split('_')[-1])
+    await callback_query.message.answer("✅ Вопрос удален")
+    await callback_query.message.delete()
 
 
-# @admin_private_router.callback_query(FSMAddProduct.category_id)
-# async def add_product_category(callback: types.CallbackQuery, state: FSMContext, session):
-#     await state.update_data(category=callback.data)
-#     await callback.answer()
-#     await callback.message.answer('✅ Товар создан')
-#     data = await state.get_data()
-#     await orm_add_product(session, data)
-#     await state.clear()
+# Write an FSM for sending messages to users. It should ask the user for the message to be sent, request a picture if needed, and inquire whom to send it to: only active subscribers or everyone including "guests". Guests are those whose status in the database is 0. Active subscribers are those whose status is 1 or higher.
+class FSMSendMessages(StatesGroup):
+    message = State()
+    picture = State()
+    recipients = State()
 
 
+@admin_private_router.callback_query(StateFilter(None), F.data == "send")
+async def send_messages(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer('Введите сообщение для отправки:')
+    await state.set_state(FSMSendMessages.message)
 
 
+@admin_private_router.message(FSMSendMessages.message)
+async def send_messages_description(message: types.Message, state: FSMContext):
+    await state.update_data(message=message.text)
+    await message.answer('Отправте картинку если нужна. Если не нужна то отправте ".":')
+    await state.set_state(FSMSendMessages.picture)
+
+
+@admin_private_router.message(FSMSendMessages.picture, F.photo)
+async def send_messages_picture(message: types.Message, state: FSMContext):
+    await state.update_data(picture=message.photo[0].file_id)
+    await message.answer('Выберите кому отправить сообщение: активные подписчики или все (включая гостей).', reply_markup=get_callback_btns(btns={'Активные подписчики': 'active_subscribers', 'Все': 'all'}))
+    await state.set_state(FSMSendMessages.recipients)
+
+
+@admin_private_router.callback_query(StateFilter(None), F.data == "active_subscribers")
+async def send_messages_active_subscribers(callback: types.CallbackQuery, state: FSMContext, session, bot):
+    await callback.answer()
+    users = await orm_get_subscribers(session)
+    for user in users:
+        await callback.message.answer(state.get_data()['message'])
+        if state.get_data()['picture']:
+            await bot.send_photo(chat_id=user.user_id, photo=state.get_data()['picture'], caption=state.get_data()['message'])
+        else:
+            await bot.send_message(chat_id=user.user_id, text=state.get_data()['message'])
+        await callback.message.delete()
+    
+    await callback.message.answer(f"Сообщение отправленно {len(users)} пользователям")
+
+
+# Заказы 
+@admin_private_router.callback_query(StateFilter(None), F.data == "orders_list")
+async def orders_list(callback: types.CallbackQuery, session):
+    await callback.answer()
+    message_text = "<"
+    orders = await orm_get_users(session)
+    for order in orders:
+        await callback.message.answer(
+            text=f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> {order.status}\n<b>Дата создания:</b> {order.created}\n<b>Дата обновления:</b> {order.updated}",
+            reply_markup=get_callback_btns(btns={'Удалить': f'deleteorder_{order.user_id}'})
+        )
+
+    if orders:
+        await callback.message.answer(
+                text="Вот список заказов ⬆",
+                reply_markup=get_callback_btns(btns={'Добавить новый заказ': f'addorder'})
+            )
+    else:
+        await callback.message.answer(
+                text="Заказов пока нет",
+                reply_markup=get_callback_btns(btns={'Добавить новый заказ': f'addorder'})
+            )

@@ -7,3 +7,4 @@ matplotlib
 gspread
 asyncpg
 aiosqlite
+fastapi

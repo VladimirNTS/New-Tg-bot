@@ -36,6 +36,7 @@ class Tariff(Base):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     sub_time: Mapped[int] = mapped_column(BigInteger)
     price: Mapped[int] = mapped_column(Numeric(5, 2), nullable=False)
+    pay_id: Mapped[str] = mapped_column(String(300), nullable=False)
 
 
 class FAQ(Base):

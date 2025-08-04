@@ -33,6 +33,7 @@ async def orm_add_tariff(session: AsyncSession, data: dict):
         name=data["name"],
         sub_time=data["sub_time"],
         price=float(data["price"]),
+        pay_id=data["pay_id"],
     )
     session.add(obj)
     await session.commit()

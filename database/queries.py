@@ -1,9 +1,10 @@
-import math
+from typing import Union
+
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from database.models import Tariff, User, Admin, FAQ
+from database.models import Tariff, User, Admin, FAQ, Products
 
 
 # Tariffs
@@ -53,11 +54,56 @@ async def orm_delete_tariff(session: AsyncSession, tariff_id: int):
     await session.commit()
 
 
+# Products
+async def orm_get_products(session: AsyncSession):
+    '''Возвращает список тарифов
+    
+    session: Ассинхроная сессия sqlalchemy
+    '''
+    query = select(Products)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def orm_edit_products(session: AsyncSession, tariff_id: int, fields: dict):
+    """
+    Обновляет только переданные поля тарифа по tariff_id.
+    fields: dict - только те поля, которые нужно обновить (например: {'name': '...', 'price': 100})
+    """
+    if not fields:
+        return
+    query = update(Products).where(Products.id == tariff_id).values(**fields)
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_add_products(session: AsyncSession, data: dict):
+    obj = Products(
+        name=data["name"],
+        sub_time=data["sub_time"],
+        price=float(data["price"]),
+        pay_id=data["pay_id"],
+    )
+    session.add(obj)
+    await session.commit()
+
+
+
+
+async def orm_delete_products(session: AsyncSession, tariff_id: int):
+    
+    query = delete(Products).where(Products.id == tariff_id)
+    await session.execute(query)
+    await session.commit()
+
+
 # Добавление пользователя
 async def orm_add_user(
     session: AsyncSession,
     user_id: int,
-    name: str | None = None,
+    name: Union[str, None] = None,
+    sub_id: Union[str, None] = None,
+    tun_id: Union[str, None] = None,
 ) -> None:
     '''Добавляет пользователя если его нет
     '''
@@ -65,7 +111,7 @@ async def orm_add_user(
     result = await session.execute(query)
     if result.first() is None:
         session.add(
-            User(user_id=user_id, name=name, status=0)
+            User(user_id=user_id, name=name, sub_id=sub_id, tun_id=tun_id, status=0)
         )
         await session.commit()
 

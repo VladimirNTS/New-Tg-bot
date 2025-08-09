@@ -8,3 +8,4 @@ gspread
 asyncpg
 aiosqlite
 fastapi
+jinja2

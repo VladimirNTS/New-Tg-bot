@@ -1,5 +1,5 @@
 from aiogram import Router, types, F
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
@@ -522,48 +522,69 @@ async def send_messages_description(message: types.Message, state: FSMContext):
     await state.set_state(FSMSendMessages.picture)
 
 
-@admin_private_router.message(FSMSendMessages.picture, F.photo)
+@admin_private_router.message(FSMSendMessages.picture, or_f(F.photo, F.text))
 async def send_messages_picture(message: types.Message, state: FSMContext):
-    await state.update_data(picture=message.photo[0].file_id)
-    await message.answer('Выберите кому отправить сообщение: активные подписчики или все (включая гостей).', reply_markup=get_callback_btns(btns={'Активные подписчики': 'active_subscribers', 'Все': 'all'}))
-    await state.set_state(FSMSendMessages.recipients)
+    if message.text == '.':
+        await message.answer('Выберите кому отправить сообщение: активные подписчики или все (включая гостей).', reply_markup=get_callback_btns(btns={'Активные подписчики': 'active_subscribers', 'Все': 'all'}))
+        await state.set_state(FSMSendMessages.recipients)
+    else:
+        await state.update_data(picture=message.photo[0].file_id)
+        await message.answer('Выберите кому отправить сообщение: активные подписчики или все (включая гостей).', reply_markup=get_callback_btns(btns={'Активные подписчики': 'active_subscribers', 'Все': 'all'}))
+        await state.set_state(FSMSendMessages.recipients)
 
 
-@admin_private_router.callback_query(StateFilter(None), F.data == "active_subscribers")
+@admin_private_router.callback_query(FSMSendMessages.recipients, F.data == "active_subscribers")
 async def send_messages_active_subscribers(callback: types.CallbackQuery, state: FSMContext, session, bot):
     await callback.answer()
     users = await orm_get_subscribers(session)
     for user in users:
-        await callback.message.answer(state.get_data()['message'])
-        if state.get_data()['picture']:
-            await bot.send_photo(chat_id=user.user_id, photo=state.get_data()['picture'], caption=state.get_data()['message'])
+        data = await state.get_data()
+
+        if data.get('picture'):
+            await bot.send_photo(chat_id=user.user_id, photo=data['picture'], caption=data['message'])
         else:
-            await bot.send_message(chat_id=user.user_id, text=state.get_data()['message'])
-        await callback.message.delete()
+            await bot.send_message(chat_id=user.user_id, text=data['message'])
+        
     
     await callback.message.answer(f"Сообщение отправленно {len(users)} пользователям")
+    await state.clear()
+
+
+@admin_private_router.callback_query(FSMSendMessages.recipients, F.data == "all")
+async def send_messages_active_subscribers(callback: types.CallbackQuery, state: FSMContext, session, bot):
+    await callback.answer()
+    users = await orm_get_users(session)
+    for user in users:
+        data = await state.get_data()
+        if data.get('picture'):
+            await bot.send_photo(chat_id=user.user_id, photo=data['picture'], caption=data['message'])
+        else:
+            await bot.send_message(chat_id=user.user_id, text=data['message'])
+    
+    await callback.message.answer(f"Сообщение отправленно {len(users)} пользователям")
+    await state.clear()
 
 
 # Заказы 
 @admin_private_router.callback_query(StateFilter(None), F.data == "orders_list")
 async def orders_list(callback: types.CallbackQuery, session):
     await callback.answer()
-    message_text = "<b>Заказы</b>"
+    message_text = ""
     orders = await orm_get_users(session)
     for order in orders:
-        message_text += f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> order{order.status}\n"
-    await callback.message.answer(
-            text=message_text,
-            reply_markup=get_callback_btns(btns={'Удалить': f'deleteorder_{order.user_id}'})
-        )
+        if order.status > 0:
+            message_text = f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> {order.status}\n"
+    
 
-    if orders:
+    if message_text:
+        await callback.message.answer(
+            text=message_text,
+            reply_markup=get_callback_btns(btns={'Заблокировать пользователя': f'blockuser_{order.user_id}'})
+        )
         await callback.message.answer(
                 text="Вот список заказов ⬆",
-                reply_markup=get_callback_btns(btns={'Добавить новый заказ': f'addorder'})
             )
     else:
         await callback.message.answer(
                 text="Заказов пока нет",
-                reply_markup=get_callback_btns(btns={'Добавить новый заказ': f'addorder'})
             )

@@ -4,7 +4,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from database.models import Tariff, User, Admin, FAQ, Products
+from database.models import Tariff, User, Admin, FAQ, Products, Payments
 
 
 # Tariffs
@@ -63,6 +63,12 @@ async def orm_get_products(session: AsyncSession):
     query = select(Products)
     result = await session.execute(query)
     return result.scalars().all()
+
+
+async def orm_get_product(session: AsyncSession, product_id: int):
+    query = select(Products).where(Products.id == product_id)
+    result = await session.execute(query)
+    return result.scalar()
 
 
 async def orm_edit_products(session: AsyncSession, tariff_id: int, fields: dict):
@@ -158,7 +164,7 @@ async def orm_get_blocked_users(session: AsyncSession):
 
 
 async def orm_get_user(session: AsyncSession, user_id: int):
-    query = select(User).where(User.id == user_id)
+    query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
     return result.scalar()
 
@@ -230,3 +236,22 @@ async def orm_edit_faq(session: AsyncSession, id: int, fields: dict):
     await session.execute(query)
     await session.commit()
 
+
+async def new_payment(session: AsyncSession, user_id: int, tariff_id: int):
+    '''Создает новую запись о платеже в таблицу'''
+    obj = Payments(
+        user_id=user_id,
+        tariff_id=tariff_id,
+    )
+    session.add(obj)
+    await session.commit()
+
+
+async def get_last_payment_id(session: AsyncSession):
+    '''Возвращает последнюю запись о платеже'''
+    query = select(Payments).order_by(Payments.id.desc()).limit(1)
+    result = await session.execute(query)
+    if result.first() is None:
+        return 0
+    else:
+        return result.scalar().id

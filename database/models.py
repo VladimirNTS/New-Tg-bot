@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, func, String, BigInteger, Text, Numeric, ForeignKey, Boolean
+from sqlalchemy import DateTime, func, String, BigInteger, Text, Numeric, ForeignKey, Boolean, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -57,3 +57,10 @@ class FAQ(Base):
     ask: Mapped[str] = mapped_column(String(50), nullable=False)
     answer: Mapped[str]  = mapped_column(Text, nullable=False)
 
+
+class Payments(Base):
+    __tablename__ = 'payments'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer)
+    tariff_id: Mapped[int] = mapped_column(Integer)

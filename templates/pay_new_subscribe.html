@@ -72,27 +72,24 @@
 <body>
     <div class="payment-form">
         <h2>Оплата подписки SkynetVPN</h2>
+        <b><p>Вы покупаете доступ на {{ time }} месяцев</p></b>
+        <p>Все подписки продливаются только после вашего подтверждения в боте, отменить подписку можно в любой момент.</p>
+        <P>После оплаты бот отправит вам ключ для приложения и ссылку на установку приложений</P>
         
         <form method="POST" action="https://auth.robokassa.ru/Merchant/Index.aspx">
             
             <div class="checkbox-group">
                 <div class="checkbox-label">
                     <input type="checkbox" id="agreement" name="agreement" required>
-                    <label for="agreement">Я согласен с <a href="#" class="terms-link">условиями оферты</a></label>
-                </div>
-                
-                <div class="checkbox-label">
-                    <input type="checkbox" id="privacy" name="privacy" required>
-                    <label for="privacy">Я согласен на <a href="#" class="terms-link">обработку персональных данных</a></label>
+                    <label for="agreement">Оплачивая подписку, вы соглашаетесь с <a href="https://skynetvpn.ru/terms-of-service.html" class="terms-link">договором офертой</a> и с <a href="https://skynetvpn.ru/privacy-policy.html" class="terms-link">политикой обработки персональных данных</a>.</label>
                 </div>
             </div>
             
             <input type="hidden" name="MerchantLogin" value="{{ shop_id }}">
-            <input type="hidden" name="InvoiceID" value="{{ invoice_id }}">
+            <input type="hidden" name="InvID" value="{{ invoice_id }}">
             <input type="hidden" name="Description" value="Оплата подписки">
             <input type="hidden" name="SignatureValue" value="{{ signature_value }}">
             <input type="hidden" name="OutSum" value="{{ price }}">
-            <input type="hidden" name="Recurring" value="true">
             
             <button type="submit" class="submit-btn">Оплатить</button>
         </form>

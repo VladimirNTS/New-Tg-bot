@@ -104,7 +104,7 @@ async def referral_program_handler(callback: types.CallbackQuery):
         # Отправляем файл пользователю
         photo = types.InputMediaPhoto(
 			media=types.FSInputFile(qr_filename),  # или BufferedInputFile для файла в памяти
-			caption=f"Приводи друзей и бесплатно продлевай свою подписку за их покупки:\nЗа 1 мес - 7 дней \nЗа 6 мес - 15 дней \nЗа 12 мес - 30 дней\n\nВаша реферальная ссылка:\n<code>{referral_link}</code>"
+			caption=f"Приводи друзей и бесплатно продлевай свою подписку за их покупки:\nЗа 1 мес - 15 дней \nЗа 6 мес - 30 дней \nЗа 12 мес - 45 дней\n\nВаша реферальная ссылка:\n<a src='{referral_link}'>{referral_link}</a>"
 		)
         await callback.message.edit_media(media=photo, reply_markup=get_callback_btns(btns={ "⬅ Назад": "back_menu"}))
         await callback.answer()

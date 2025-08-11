@@ -58,12 +58,12 @@ async def subscribe(
 
     user = await orm_get_user(async_session, user_id=user_id)
     tariff = await orm_get_tariff(async_session, tariff_id=sub_id)
-
-    base_string = f"{os.getenv('SHOP_ID')}:{tariff.price}::{os.getenv('PASSWORD_1')}"
+    invoice_id = await get_last_payment_id(async_session) + 1
+    
+    base_string = f"{os.getenv('SHOP_ID')}:{tariff.price}:{invoice_id}:{os.getenv('PASSWORD_1')}"
     signature_value = hashlib.md5(base_string.encode("utf-8")).hexdigest()
-    invoice_id = await get_last_payment_id(async_session)
 
-    return templates.TemplateResponse("/pay_new_subscribe.html", {"request": request, "price": tariff.price, "shop_id": os.getenv("SHOP_ID"), "signature_value": signature_value, "invoice_id": invoice_id})
+    return templates.TemplateResponse("/pay_new_subscribe.html", {"request": request, "price": tariff.price, "time": tariff.sub_time, "shop_id": os.getenv("SHOP_ID"), "signature_value": signature_value, "invoice_id": invoice_id})
 
 
 @app.get("/new_order", response_class=HTMLResponse)
@@ -76,12 +76,12 @@ async def buy(
 
     user = await orm_get_user(async_session, user_id=user_id)
     tariff = await orm_get_product(async_session, product_id=sub_id)
-
     invoice_id = await get_last_payment_id(async_session) + 1
     base_string = f"{os.getenv('SHOP_ID')}:{tariff.price}:{invoice_id}:{os.getenv('PASSWORD_1')}"
     signature_value = hashlib.md5(base_string.encode("utf-8")).hexdigest()
     print(f"{os.getenv('SHOP_ID')}:{tariff.price}:{invoice_id}:{os.getenv('PASSWORD_1')}")
-    return templates.TemplateResponse("/buy_one_time.html", {"request": request, "price": tariff.price, "shop_id": os.getenv("SHOP_ID"), "signature_value": signature_value, "invoice_id": invoice_id, "time": tariff.price})
+    print({"request": request, "price": tariff.price, "time": tariff.sub_time, "shop_id": os.getenv("SHOP_ID"), "signature_value": signature_value, "invoice_id": invoice_id, "time": tariff.price})
+    return templates.TemplateResponse("/buy_one_time.html", {"request": request, "price": tariff.price, "time": tariff.sub_time, "shop_id": os.getenv("SHOP_ID"), "signature_value": signature_value, "invoice_id": invoice_id})
 
 
 

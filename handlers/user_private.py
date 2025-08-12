@@ -1,14 +1,18 @@
+import uuid
+from datetime import datetime
+
 from aiogram import Router, types, F
 from aiogram.filters import Command
-from io import BytesIO
 import time
 import os
+from urllib.parse import quote
 
 import qrcode
 from filters.users_filter import BlockedUsersFilter
 
 from kbds.inline import get_callback_btns, get_inlineMix_btns, get_url_btns
 from database.queries import (
+    orm_change_user_status,
     orm_get_tariffs,
     orm_get_faq,
     orm_get_user,
@@ -20,7 +24,7 @@ user_private_router.message.filter(BlockedUsersFilter())
 
 @user_private_router.message(Command("start"))
 async def start(message: types.Message, session):
-    await orm_add_user(session=session, user_id=message.from_user.id, name=message.from_user.full_name)
+    await orm_add_user(session=session, user_id=message.from_user.id, name=message.from_user.full_name+str(uuid.uuid4()).split('-')[0])
     await message.answer_photo(
         photo=types.FSInputFile("img/banner.png"),
         caption="<b>SkynetVPN это безопасный доступ в один клик</b>\nС нами Вы под надёжной защитой\nНикто не должен следить за тем, что вы смотрите", 
@@ -125,8 +129,23 @@ async def orders_list(callback: types.CallbackQuery, session):
 async def check_subscription(callback: types.CallbackQuery, session):
     user_id = callback.from_user.id
     user = await orm_get_user(session, user_id)
+
+    url = f'v2raytun://{user.sub_id}@super.skynetvpn.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&flow=xtls-rprx-vision#SkynetVPN-{quote(user.name)}'
+    
     if user.status > 0:
-        await callback.message.edit_caption(caption=f"Ваша подписка действует до {user.sub_end}")
+        await callback.message.edit_caption(caption=f"Текущий тариф: f'{i.sub_time} месяцев, {i.price} ₽ {'(Подписка)' if i.recuring == True else '(Единоразовая покупка)'}'\nВаша подписка действует до {user.sub_end}. \nВаша ссылка для подключения <code>{url}</code>", reply_markup=get_callback_btns(btns={ "⬅ Назад": "back_menu"}))
     else:
         await callback.answer("У вас нет активной подписки")
+
+
+# Создание подписки для пользователя после оплаты
+async def create_subscription(sub_data: dict, session, user_id, tariff, bot):
+    date = sub_data['expire_time'] / 1000 
+    date = datetime.fromtimestamp(date)
+
+    await orm_change_user_status(session, user_id=user_id, new_status=tariff.id, tun_id=str(sub_data['id']), sub_end=date)
+    url = f'v2raytun://{sub_data['id']}@super.skynetvpn.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&flow=xtls-rprx-vision#SkynetVPN-{quote(sub_data["email"])}'
+    await bot.send_message(user_id, f"<b>Оплата прошла успешно!</b>\nВаша подписка на активна до {date}\n\nВаша ссылка для подключения <code>{url}</code>\n\nСпасибо за покупку! \n\nЕсли у вас есть вопросы, не стесняйтесь задавать.", reply_markup=get_callback_btns(btns={ "⬅ Назад": "back_menu"}))
+
+
 

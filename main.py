@@ -1,3 +1,4 @@
+
 import hashlib
 import logging
 import os
@@ -15,6 +16,8 @@ from starlette.responses import Response
 import uvicorn
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
+from handlers.user_private import create_subscription
 load_dotenv()
 from aiogram.types import Update
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -29,6 +32,7 @@ from database.queries import (
     orm_get_payment
 )
 from skynetapi.skynetapi import auth, add_customer, edit_customer_date
+
 
 
 class PayResponce(BaseModel):
@@ -110,7 +114,9 @@ async def release(*, body: PayResponce):
         current_date = datetime.now()
         new_date = current_date + relativedelta(months=tariff.sub_time)
 
-        new_vpn_user = await add_customer(cookies=await auth(), email=user.name, expire_time=(new_date.timestamp() * 1000))
+        new_vpn_user = await add_customer(cookies=await auth(), email=user.name, expire_time=(new_date.timestamp() * 1000), limit_ip=tariff.devices)
+        await create_subscription(new_vpn_user, async_session, user.user_id, tariff, bot)
+
 
     return f'OK{body.InvId}'
 

@@ -73,11 +73,11 @@ async def orm_add_user(
         await session.commit()
 
 
-async def orm_change_user_status(session: AsyncSession, user_id, new_status, sub_time, tun_id):
+async def orm_change_user_status(session: AsyncSession, user_id, new_status, sub_end, tun_id):
     
     query = update(User).where(User.id == user_id).values(
             status=new_status,
-            sub_time=sub_time,
+            sub_end=sub_end,
             tun_id=tun_id
         )
     await session.execute(query)

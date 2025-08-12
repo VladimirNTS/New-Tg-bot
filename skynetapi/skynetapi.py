@@ -39,13 +39,13 @@ async def auth():
             return cookies
 
 
-async def add_customer(cookies, email, expire_time):
+async def add_customer(cookies, email, expire_time, limit_ip):
     id = uuid.uuid4()
     sub_id = str(uuid.uuid4()).split('-')[0]
 
     data = {
         'id': '1',
-        'settings': '{"clients": [{\n  "id": "%s",\n  "flow": "",\n  "email": "%s",\n  "limitIp": 0,\n  "totalGB": 0,\n  "expiryTime": %s,\n  "enable": true,\n  "tgId": "",\n  "subId": "%s",\n  "comment": "",\n  "reset": 0\n}]}' % (id, email, expire_time, sub_id)
+        'settings': '{"clients": [{\n  "id": "%s",\n  "flow": "",\n  "email": "%s",\n  "limitIp": %s,\n  "totalGB": 0,\n  "expiryTime": %s,\n  "enable": true,\n  "tgId": "",\n  "subId": "%s",\n  "comment": "",\n  "reset": 0\n}]}' % (id, email, limit_ip, expire_time, sub_id)
     }
 
     async with aiohttp.ClientSession(headers=headers, cookies=cookies) as session:

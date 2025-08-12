@@ -29,7 +29,7 @@ async def start(message: types.Message, session):
         photo=types.FSInputFile("img/banner.png"),
         caption="<b>SkynetVPN это безопасный доступ в один клик</b>\nС нами Вы под надёжной защитой\nНикто не должен следить за тем, что вы смотрите", 
         reply_markup=get_inlineMix_btns(
-            btns={"📄 Оформить подписку": "choosesubscribe", "🔍 Проверить подписку": "check_subscription", "🤝 реферальная програма": "referral_program", "❓ FAQ": "faq", "☎ Поддержка": "https://t.me/skynetaivpn_support"}, 
+            btns={"📄 Оформить подписку": "choosesubscribe", "🔍 Проверить подписку": "check_subscription", "📲 Установить VPN": "install","🤝 реферальная програма": "referral_program", "❓ FAQ": "faq", "☎ Поддержка": "https://t.me/skynetaivpn_support"}, 
             sizes=(1,1,1,2)
         )
     )
@@ -138,6 +138,26 @@ async def check_subscription(callback: types.CallbackQuery, session):
         await callback.answer("У вас нет активной подписки")
 
 
+@user_private_router.callback_query(F.data == 'install')
+async def install_helper(callback: types.CallbackQuery, session):
+    await callback.message.edit_caption("<b>Выберите своё устройство</b>:
+
+Сделали пошаговые инструкции для подключения VPN! Нажмите на нужную кнопку и подключайтесь за несколько минут.", reply_markup=get_callback_btns({'📱 Android': 'help_android', '🍏 Iphone': 'help_iphone', '🖥 Windows': 'help_windows', '💻 MacOS': 'help_macos', '🐧 Linux': 'help_linux', '📺 AndroidTV'}))
+
+
+@user_private_router.callback_query(F.data.startswith('help_'))
+async def install(callback):
+    text = {
+            'android': '',
+            'iphone': '',
+            'windows': '',
+            'macos': '',
+            'linux': '',
+            'androidtv': '',
+            }
+    await callback.message.edit_caption(caption=text[callback.data.split('_')[-1]][0])
+
+
 # Создание подписки для пользователя после оплаты
 async def create_subscription(sub_data: dict, session, user_id, tariff, bot):
     date = sub_data['expire_time'] / 1000 
@@ -146,6 +166,10 @@ async def create_subscription(sub_data: dict, session, user_id, tariff, bot):
     await orm_change_user_status(session, user_id=user_id, new_status=tariff.id, tun_id=str(sub_data['id']), sub_end=date)
     url = f'v2raytun://{sub_data['id']}@super.skynetvpn.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&flow=xtls-rprx-vision#SkynetVPN-{quote(sub_data["email"])}'
     await bot.send_message(user_id, f"<b>Оплата прошла успешно!</b>\nВаша подписка на активна до {date}\n\nВаша ссылка для подключения <code>{url}</code>\n\nСпасибо за покупку! \n\nЕсли у вас есть вопросы, не стесняйтесь задавать.", reply_markup=get_callback_btns(btns={ "⬅ Назад": "back_menu"}))
+
+
+
+
 
 
 

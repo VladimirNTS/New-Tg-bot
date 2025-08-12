@@ -13,7 +13,6 @@ from database.queries import (
     orm_get_faq,
     orm_get_user,
     orm_add_user,
-    orm_get_products
 )
 
 user_private_router = Router()
@@ -52,24 +51,15 @@ async def start(callback: types.CallbackQuery):
 async def choose_subscribe(callback: types.CallbackQuery, session):
     user = await orm_get_user(session, callback.from_user.id)
     tariffs = await orm_get_tariffs(session)
-    products = await orm_get_products(session)
     btns = {"⬅ Назад": "back_menu"}
 
-    for i in products:
-        if i.sub_time == 1:
-            btns[f'{i.sub_time} день, {i.price} ₽ (Единоразовая покупка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_order?user_id={user.id}&sub_id={i.id}'
-        elif i.sub_time < 5:
-            btns[f'{i.sub_time} дня, {i.price} ₽ (Единоразовая покупка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_order?user_id={user.id}&sub_id={i.id}'
-        else:
-            btns[f'{i.sub_time} дней, {i.price} ₽ (Единоразовая покупка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_order?user_id={user.id}&sub_id={i.id}'
-    
     for i in tariffs:
         if i.sub_time == 1:
-            btns[f'{i.sub_time} месяцев, {i.price} ₽ (Подписка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
+            btns[f'{i.sub_time} месяцев, {i.price} ₽ {'(Подписка)' if i.recuring == True else '(Единоразовая покупка)'}'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
         elif i.sub_time < 5:
-            btns[f'{i.sub_time} месяца, {i.price} ₽ (Подписка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
+            btns[f'{i.sub_time} месяца, {i.price} ₽ {'(Подписка)' if i.recuring == True else '(Единоразовая покупка)'}'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
         else:
-            btns[f'{i.sub_time} месяц, {i.price} ₽ (Подписка)'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
+            btns[f'{i.sub_time} месяц, {i.price} ₽ {'(Подписка)' if i.recuring == True else '(Единоразовая покупка)'}'] = f'{os.getenv("PAY_PAGE_URL")}/new_subscribe?user_id={user.id}&sub_id={i.id}'
     
     await callback.message.edit_caption(caption='<b>Выберите тариф</b>\n\n<b>Единоразовая покупка</b> - вы платите 1 раз, подписка не продлевается автоматически\n<b>Подписка</b> - деньги списываются автоматически по указаному сроку, вам лишь нужно будет подтверждать оплату 1 по кнопке в боте.', reply_markup=get_inlineMix_btns(btns=btns, sizes=(1,)))
 

@@ -34,20 +34,10 @@ class Tariff(Base):
     __tablename__ = 'tariffs'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
     sub_time: Mapped[int] = mapped_column(BigInteger)
     price: Mapped[int] = mapped_column(Numeric(5, 2), nullable=False)
-    pay_id: Mapped[str] = mapped_column(String(300), nullable=False)
-    
-
-class Products(Base):
-    __tablename__ = 'products'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    sub_time: Mapped[int] = mapped_column(BigInteger)
-    price: Mapped[int] = mapped_column(Numeric(5, 2), nullable=False)
-    pay_id: Mapped[str] = mapped_column(String(300), nullable=False)
+    devices: Mapped[int] = mapped_column(Integer)
+    recuring: Mapped[bool] = mapped_column(Boolean, default=False)
     
 
 class FAQ(Base):
@@ -64,3 +54,4 @@ class Payments(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer)
     tariff_id: Mapped[int] = mapped_column(Integer)
+    paid: Mapped[bool] = mapped_column(Boolean, default=False)

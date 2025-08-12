@@ -13,10 +13,6 @@ from database.queries import (
     orm_add_tariff,
     orm_delete_tariff,
     orm_edit_tariff,
-    orm_get_products,
-    orm_add_products,
-    orm_delete_products,
-    orm_edit_products,
     orm_add_faq,
     orm_get_faq,
     orm_delete_faq,
@@ -41,19 +37,13 @@ async def start(message: types.Message):
 @admin_private_router.callback_query(F.data == 'tariffs_list')
 async def choose_category(callback_query: types.CallbackQuery, session):
     await callback_query.answer()
-    product_list = await orm_get_products(session)
-
-    for product in product_list:
-        await callback_query.message.answer(
-            text=f"<b>Имя:</b> {product.name}\n<b>Срок:</b> {product.sub_time} дней\n<b>Цена:</b> {product.price}\n<b>ID для оплаты:</b> {product.pay_id}\n<b>Тип: единоразовый платеж</b>", 
-            reply_markup=get_callback_btns(btns={'Изменить': f'editonepay_{product.id}', 'Удалить': f'deleteonepay_{product.id}'})
-        )
+    
 
     tariff_list = await orm_get_tariffs(session)
 
     for tariff in tariff_list:
         await callback_query.message.answer(
-            text=f"<b>Имя:</b> {tariff.name}\n<b>Срок:</b> {tariff.sub_time} месяцев\n<b>Цена:</b> {tariff.price}\n<b>ID для оплаты:</b> {tariff.pay_id}\n<b>Тип: повторяющийся платеж</b>", 
+            text=f"<b>Срок:</b> {tariff.sub_time} месяцев\n<b>Цена:</b> {tariff.price}\n<b>Количествоо устройств:</b> {tariff.devices}\n<b>Тип: {'повторяющийся платеж' if tariff.recuring else 'единоразовый платеж'}</b>", 
             reply_markup=get_callback_btns(btns={'Изменить': f'edittariff_{tariff.id}', 'Удалить': f'deletetariff_{tariff.id}'})
         )
     
@@ -65,23 +55,20 @@ async def choose_category(callback_query: types.CallbackQuery, session):
     else:
         await callback_query.message.answer(
                 text="Тарифов пока нет", 
-                reply_markup=get_callback_btns(btns={'Добавить новый тариф': f'addtariff'})
+                reply_markup=get_callback_btns(btns={'Добавить новый тариф': f'addtariff', 'Добавить единоразовый платеж': f'addonepay'})
             )
 
 
 # FSM для добавления тарифов
 class FSMAddTariff(StatesGroup):
-    name = State()
     sub_time = State()
     price = State()
-    pay_id = State()
+    devices = State()
 
 # Undo text for add tariff FSM
 FSMAddTariff_undo_text = {
-    'FSMAddTariff:name': 'Введите название тарифа заново',
     'FSMAddTariff:sub_time': 'Введите время подписки (в днях) заново',
     'FSMAddTariff:price': 'Введите цену подписки заново',
-    'FSMAddTariff:pay_id': 'Введите ссылку для оплаты заново',
 }
 
 # Cancel handler for FSMAddTariff
@@ -91,7 +78,7 @@ async def cancel_fsm_add_tariff(message: types.Message, state: FSMContext):
     if current_state is None:
         return
     await state.clear()
-    await message.answer('❌ Добавление тарифа отменено')
+    await message.answer('❌ Отменено')
 
 # Back handler for FSMAddTariff
 @admin_private_router.message(StateFilter('FSMAddTariff'), F.text.in_({'/назад', 'назад'}))
@@ -111,50 +98,45 @@ async def back_step_add_tariff(message: types.Message, state: FSMContext):
 
 
 @admin_private_router.callback_query(StateFilter(None), F.data == "addtariff")
-async def add_product(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer()
-    await callback.message.answer('Введите название тарифа(необязательно, введите . чтобы пропустить):')
-    await state.set_state(FSMAddTariff.name)
-
-
-@admin_private_router.message(FSMAddTariff.name)
-async def add_product_description(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(name='')
-    else:
-        await state.update_data(name=message.text)
+async def add_product_description(callback: types.CallbackQuery, state: FSMContext):
     
-    await message.answer('Введите время подписки (в месяцах):')
+    await callback.message.answer('Введите время подписки (в месяцах):')
     await state.set_state(FSMAddTariff.sub_time)
 
 
 @admin_private_router.message(FSMAddTariff.sub_time)
-async def add_product_description(message: types.Message, state: FSMContext):
+async def add_product_description(message, state: FSMContext):
     try:
         await state.update_data(sub_time=int(message.text))
-        await message.answer('Введите цену подписки:')
-        await state.set_state(FSMAddTariff.price)
     except:
          await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
+    await message.answer('Введите количество устройств:')
+    await state.set_state(FSMAddTariff.devices)
+
+
+@admin_private_router.message(FSMAddTariff.devices)
+async def add_product_description(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(devices=int(message.text))
+    except:
+         await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
+    await message.answer('Введите цену подписки:')
+    await state.set_state(FSMAddTariff.price)
+    
 
 
 @admin_private_router.message(FSMAddTariff.price)
-async def add_product_description(message: types.Message, state: FSMContext):
+async def add_product(message: types.Message, state: FSMContext, session):
     try:
         await state.update_data(price=int(message.text))
-        await message.answer('Введите ссылку для оплаты:')
-        await state.set_state(FSMAddTariff.pay_id)
+        await state.update_data(recuring=True)
     except:
          await message.answer('Неверный формат. Введите цену еще раз:')
-
-
-@admin_private_router.message(FSMAddTariff.pay_id)
-async def add_product(message: types.Message, state: FSMContext, session):
-    await state.update_data(pay_id=message.text.split('=')[-1])
     await message.answer('✅ Тариф добавлен')
     data = await state.get_data()
     await orm_add_tariff(session=session, data=data)
     await state.clear()
+    
 
 
 # Удаление тарифа
@@ -166,30 +148,16 @@ async def delete_product(callback_query: types.CallbackQuery, session):
     await callback_query.message.delete()
 
 
-# Редактирование единоразового платежа
 class FSMEditTariff(StatesGroup):
-    name = State()
     sub_time = State()
     price = State()
-    pay_id = State()
+    devices = State()
 
 
 @admin_private_router.callback_query(StateFilter(None), F.data.startswith("edittariff"))
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(tariff_id=callback.data.split('_')[-1])
-    await callback.answer()
-    await callback.message.answer('Вы создаете новый тариф. Для отмены напишите /отмена или /назад')
-    await callback.message.answer('Введите новое название тарифа(необязательно, введите . чтобы пропустить):')
-    await state.set_state(FSMEditTariff.name)
-
-
-@admin_private_router.message(FSMEditTariff.name)
-async def edit_tariff_name(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(name=None)
-    else:
-        await state.update_data(name=message.text)
-    await message.answer('Введите новое время подписки (в месяцах) (или . чтобы пропустить):')
+    await callback.message.answer('Введите новое время подписки (в месяцах) (или . чтобы пропустить):')
     await state.set_state(FSMEditTariff.sub_time)
 
 @admin_private_router.message(FSMEditTariff.sub_time)
@@ -210,22 +178,24 @@ async def edit_tariff_sub_time(message: types.Message, state: FSMContext):
 async def edit_tariff_price(message: types.Message, state: FSMContext):
     if message.text == '.':
         await state.update_data(price=None)
-        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
-        await state.set_state(FSMEditTariff.pay_id)
+        await message.answer('Введите новое количество устройств (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.devices)
         return
     try:
         await state.update_data(price=int(message.text))
-        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
-        await state.set_state(FSMEditTariff.pay_id)
+        await message.answer('Введите новое количество устройств (или . чтобы пропустить):')
+        await state.set_state(FSMEditTariff.devices)
     except:
         await message.answer('Неверный формат. Введите цену еще раз:')
 
-@admin_private_router.message(FSMEditTariff.pay_id)
+    
+
+@admin_private_router.message(FSMEditTariff.devices)
 async def edit_tariff_pay_id(message: types.Message, state: FSMContext, session):
     if message.text == '.':
-        await state.update_data(pay_id=None)
+        await state.update_data(devices=None)
     else:
-        await state.update_data(pay_id=message.text.split('=')[-1])
+        await state.update_data(devices=message.text.split('=')[-1])
     data = await state.get_data()
     # Оставляем только те поля, которые не None
     update_fields = {k: v for k, v in data.items() if v is not None}
@@ -237,17 +207,14 @@ async def edit_tariff_pay_id(message: types.Message, state: FSMContext, session)
 
 # FSM для добавления единоразового платежа
 class FSMAddOnePay(StatesGroup):
-    name = State()
     sub_time = State()
     price = State()
-    pay_id = State()
+    devices = State()
 
 # Undo text for add tariff FSM
 FSMAddOnePay_undo_text = {
-    'FSMAddTariff:name': 'Введите название платежа заново',
     'FSMAddTariff:sub_time': 'Введите время платежа (в днях) заново',
     'FSMAddTariff:price': 'Введите цену платежа заново',
-    'FSMAddTariff:pay_id': 'Введите ссылку для оплаты заново',
 }
 
 # Cancel handler for FSMAddTariff
@@ -278,126 +245,51 @@ async def back_step_add_tariff(message: types.Message, state: FSMContext):
 
 @admin_private_router.callback_query(StateFilter(None), F.data == "addonepay")
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer()
-    await callback.message.answer('Введите название платежа(необязательно, введите . чтобы пропустить):')
-    await state.set_state(FSMAddOnePay.name)
-
-
-@admin_private_router.message(FSMAddOnePay.name)
-async def add_product_description(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(name='')
-    else:
-        await state.update_data(name=message.text)
-    
-    await message.answer('Введите время подписки (в днях):')
+    await callback.message.answer('Введите время подписки (в днях):')
     await state.set_state(FSMAddOnePay.sub_time)
 
 
 @admin_private_router.message(FSMAddOnePay.sub_time)
-async def add_product_description(message: types.Message, state: FSMContext):
+async def add_product_description(message, state: FSMContext):
     try:
         await state.update_data(sub_time=int(message.text))
-        await message.answer('Введите цену платежа:')
-        await state.set_state(FSMAddOnePay.price)
     except:
-         await message.answer('Неверный формат. Введите время подписки (в днях) еще раз:')
+         await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
+         return
+    await message.answer('Введите количество устройств:')
+    await state.set_state(FSMAddOnePay.devices)
+
+
+@admin_private_router.message(FSMAddOnePay.devices)
+async def add_product_description(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(devices=int(message.text))
+    except:
+        await message.answer('Неверный формат. Введите время подписки (в днях) еще раз:')
+        return
+    await message.answer('Введите цену платежа:')
+    await state.set_state(FSMAddOnePay.price)
+    
+
 
 
 @admin_private_router.message(FSMAddOnePay.price)
-async def add_product_description(message: types.Message, state: FSMContext):
+async def add_product(message: types.Message, state: FSMContext, session):
     try:
         await state.update_data(price=int(message.text))
-        await message.answer('Введите ссылку для оплаты:')
-        await state.set_state(FSMAddOnePay.pay_id)
     except:
          await message.answer('Неверный формат. Введите цену еще раз:')
-
-
-@admin_private_router.message(FSMAddOnePay.pay_id)
-async def add_product(message: types.Message, state: FSMContext, session):
     await state.update_data(pay_id=message.text.split('=')[-1])
-    await message.answer('✅ Тариф добавлен')
+    await state.update_data(recuring=False)
     data = await state.get_data()
-    await orm_add_products(session=session, data=data)
-    await state.clear()
-
-
-# Удаление единоразового платежа
-@admin_private_router.callback_query(F.data.startswith('deleteonepay_'))
-async def delete_product(callback_query: types.CallbackQuery, session):
-    await callback_query.answer()
-    await orm_delete_products(session, callback_query.data.split('_')[-1])
-    await callback_query.message.answer("✅ Платежа удален")
-    await callback_query.message.delete()
-
-
-# Редактирование единоразового платежа
-class FSMEditOnePay(StatesGroup):
-    name = State()
-    sub_time = State()
-    price = State()
-    pay_id = State()
-
-
-@admin_private_router.callback_query(StateFilter(None), F.data.startswith("editonepay"))
-async def add_product(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(tariff_id=callback.data.split('_')[-1])
-    await callback.answer()
-    await callback.message.answer('Введите новое название платежа(необязательно, введите . чтобы пропустить):')
-    await state.set_state(FSMEditOnePay.name)
-
-
-@admin_private_router.message(FSMEditOnePay.name)
-async def edit_tariff_name(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(name=None)
-    else:
-        await state.update_data(name=message.text)
-    await message.answer('Введите новое время подписки (в днях) (или . чтобы пропустить):')
-    await state.set_state(FSMEditOnePay.sub_time)
-
-@admin_private_router.message(FSMEditOnePay.sub_time)
-async def edit_tariff_sub_time(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(sub_time=None)
-        await message.answer('Введите новую цену подписки (или . чтобы пропустить):')
-        await state.set_state(FSMEditOnePay.price)
-        return
     try:
-        await state.update_data(sub_time=int(message.text))
-        await message.answer('Введите новую цену подписки (или . чтобы пропустить):')
-        await state.set_state(FSMEditOnePay.price)
+        await orm_add_tariff(session=session, data=data)
+        await message.answer('✅ Тариф добавлен')
     except:
-        await message.answer('Неверный формат. Введите время подписки (в днях) еще раз:')
-
-@admin_private_router.message(FSMEditOnePay.price)
-async def edit_tariff_price(message: types.Message, state: FSMContext):
-    if message.text == '.':
-        await state.update_data(price=None)
-        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
-        await state.set_state(FSMEditOnePay.pay_id)
-        return
-    try:
-        await state.update_data(price=int(message.text))
-        await message.answer('Введите новую ссылку для оплаты (или . чтобы пропустить):')
-        await state.set_state(FSMEditOnePay.pay_id)
-    except:
-        await message.answer('Неверный формат. Введите цену еще раз:')
-
-@admin_private_router.message(FSMEditOnePay.pay_id)
-async def edit_tariff_pay_id(message: types.Message, state: FSMContext, session):
-    if message.text == '.':
-        await state.update_data(pay_id=None)
-    else:
-        await state.update_data(pay_id=message.text.split('=')[-1])
-    data = await state.get_data()
-    # Оставляем только те поля, которые не None
-    update_fields = {k: v for k, v in data.items() if v is not None}
-    del update_fields['tariff_id']
-    await message.answer('✅ Тариф изменен')
-    await orm_edit_products(session=session, tariff_id=data['tariff_id'], fields=update_fields)
-    await state.clear()
+        await message.answer('❌ Ошибка добавления тарифа')
+    finally:
+        await state.clear()
+    
 
 
 # FAQ

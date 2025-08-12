@@ -1,4 +1,5 @@
 import asyncio
+import os
 import aiohttp
 import uuid
 
@@ -9,8 +10,8 @@ headers = {
     'Accept-Language': 'ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7',
     'Connection': 'keep-alive',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'Origin': 'https://super.skynetvpn.ru:1945',
-    'Referer': 'https://super.skynetvpn.ru:1945/paneladmin/panel/inbounds',
+    'Origin': 'https://super.skynetvpn.ru:8080',
+    'Referer': 'https://super.skynetvpn.ru:8080/paneladmin/panel/inbounds',
     'Sec-Fetch-Dest': 'empty',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Site': 'same-origin',
@@ -24,14 +25,14 @@ headers = {
 
 async def auth():
     data = {
-        'username': 'DtuPkgCqwV',
-        'password': 'm1Y35enELz',
+        'username': os.getenv('SKY_USERNAME'),
+        'password': os.getenv('SKY_PASSWORD'),
         'twoFactorCode': '',
     }
-
+    print(data)
 
     async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.post('https://super.skynetvpn.ru:1945/paneladmin/login', data=data) as response:
+        async with session.post('https://super.skynetvpn.ru:8080/paneladmin/login', data=data) as response:
             text = await response.text()
             print(text)
             cookies = response.cookies
@@ -49,7 +50,7 @@ async def add_customer(cookies, email, expire_time):
 
     async with aiohttp.ClientSession(headers=headers, cookies=cookies) as session:
         async with session.post(
-            'https://super.skynetvpn.ru:1945/paneladmin/panel/inbound/addClient',
+            'https://super.skynetvpn.ru:8080/paneladmin/panel/inbound/addClient',
             data=data,
         ) as response:
             text = await response.text()
@@ -73,7 +74,7 @@ async def edit_customer_date(cookies, expire_time, id, session):
 
     async with aiohttp.ClientSession(headers=headers, cookies=cookies) as session:
         async with session.post(
-            f'https://super.skynetvpn.ru:1945/paneladmin/panel/inbound/updateClient/{user.tun_id}',
+            f'https://super.skynetvpn.ru:8080/paneladmin/panel/inbound/updateClient/{user.tun_id}',
             data=data,
         ) as response:
             text = await response.text()

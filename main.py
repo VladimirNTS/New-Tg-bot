@@ -3,10 +3,11 @@ import hashlib
 import logging
 import os
 from datetime import datetime, timedelta
+from urllib.parse import quote
 from dateutil.relativedelta import relativedelta
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -110,12 +111,15 @@ async def release(*, body: PayResponce):
     user = await orm_get_user_by_id(async_session, payment.user_id)
     tariff = await orm_get_tariff(async_session, payment.tariff_id)
 
-    if tariff.recuring:
-        current_date = datetime.now()
-        new_date = current_date + relativedelta(months=tariff.sub_time)
+    if not user.tun_id:
+        if tariff.recuring:
+            current_date = datetime.now()
+            new_date = current_date + relativedelta(months=tariff.sub_time)
 
-        new_vpn_user = await add_customer(cookies=await auth(), email=user.name, expire_time=(new_date.timestamp() * 1000), limit_ip=tariff.devices)
-        await create_subscription(new_vpn_user, async_session, user.user_id, tariff, bot)
+            new_vpn_user = await add_customer(cookies=await auth(), email=user.name, expire_time=(new_date.timestamp() * 1000), limit_ip=tariff.devices)
+            await create_subscription(new_vpn_user, async_session, user.user_id, tariff, bot)
+        if user.invited_by:
+            pass
 
 
     return f'OK{body.InvId}'
@@ -125,6 +129,17 @@ async def release(*, body: PayResponce):
 async def webhook(request: Request) -> None:
     update = Update.model_validate(await request.json(), context={"bot": bot})
     await dp.feed_update(bot, update)
+
+
+@app.get("/config")
+async def redirect_to_new_url(user_id: int):
+    async_session = await get_session(session_pool=session)
+    user = await orm_get_user_by_id(async_session, user_id=user_id)
+    print(bool(user))
+    if user:
+        url = f'v2raytun://import/{user.tun_id}@super.skynetvpn.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&flow=xtls-rprx-vision#SkynetVPN-{quote(user.name)}'
+        return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
+
 
 
 if __name__ == "__main__":

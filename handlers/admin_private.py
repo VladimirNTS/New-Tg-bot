@@ -16,7 +16,8 @@ from database.queries import (
     orm_add_faq,
     orm_get_faq,
     orm_delete_faq,
-    orm_edit_faq
+    orm_edit_faq,
+    orm_unblock_user
 )
 
 admin_private_router = Router()
@@ -110,6 +111,7 @@ async def add_product_description(message, state: FSMContext):
         await state.update_data(sub_time=int(message.text))
     except:
          await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
+         return
     await message.answer('Введите количество устройств:')
     await state.set_state(FSMAddTariff.devices)
 
@@ -120,6 +122,7 @@ async def add_product_description(message: types.Message, state: FSMContext):
         await state.update_data(devices=int(message.text))
     except:
          await message.answer('Неверный формат. Введите время подписки (в месяцах) еще раз:')
+         return
     await message.answer('Введите цену подписки:')
     await state.set_state(FSMAddTariff.price)
     
@@ -132,6 +135,7 @@ async def add_product(message: types.Message, state: FSMContext, session):
         await state.update_data(recuring=True)
     except:
          await message.answer('Неверный формат. Введите цену еще раз:')
+         return
     await message.answer('✅ Тариф добавлен')
     data = await state.get_data()
     await orm_add_tariff(session=session, data=data)
@@ -465,14 +469,16 @@ async def orders_list(callback: types.CallbackQuery, session):
     orders = await orm_get_users(session)
     for order in orders:
         if order.status > 0:
-            message_text = f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Статус:</b> {order.status}\n"
+            message_text = f"<b>ID:</b> {order.user_id}\n<b>Имя:</b> {order.name}\n<b>Тариф:</b> {order.status}\n"
     
 
-    if message_text:
-        await callback.message.answer(
-            text=message_text,
-            reply_markup=get_callback_btns(btns={'Заблокировать пользователя': f'blockuser_{order.user_id}'})
-        )
+        if message_text:
+            await callback.message.answer(
+                text=message_text,
+                reply_markup=get_callback_btns(btns={'Заблокировать пользователя': f'blockuser_{order.user_id}'})
+            )
+
+    if orders:
         await callback.message.answer(
                 text="Вот список заказов ⬆",
             )
@@ -480,3 +486,21 @@ async def orders_list(callback: types.CallbackQuery, session):
         await callback.message.answer(
                 text="Заказов пока нет",
             )
+
+
+
+# заблокировать пользователя
+@admin_private_router.callback_query(StateFilter(None), F.data.startswith('blockuser_'))
+async def block_user(callback: types.CallbackQuery, session):
+    await callback.answer()
+    await orm_block_user(session, callback.data.split('_')[-1])
+    await callback.message.answer("✅ Пользователь заблокирован", reply_markup=get_callback_btns(btns={'разблокировать пользователя': f'unblockuser_{callback.data.split('_')[-1]}'}))
+
+
+# Разблокировать пользователя
+@admin_private_router.callback_query(StateFilter(None), F.data.startswith('unblockuser_'))
+async def unblock_user(callback: types.CallbackQuery, session):
+    await callback.answer()
+    await orm_unblock_user(session, callback.data.split('_')[-1])
+    await callback.message.answer("✅ Пользователь разблокирован")
+

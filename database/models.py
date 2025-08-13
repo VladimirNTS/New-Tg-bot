@@ -17,7 +17,7 @@ class User(Base):
     sub_id: Mapped[str] = mapped_column(String(50), nullable=True)
     status: Mapped[int] = mapped_column(BigInteger)
     sub_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
-    invited_users: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    invited_by: Mapped[int] = mapped_column(BigInteger, nullable=True)
     blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
 

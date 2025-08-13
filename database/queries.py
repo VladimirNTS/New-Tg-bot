@@ -61,6 +61,7 @@ async def orm_add_user(
     name: Union[str, None] = None,
     sub_id: Union[str, None] = None,
     tun_id: Union[str, None] = None,
+    invited_by: Union[int, None] = None,
 ) -> None:
     '''Добавляет пользователя если его нет
     '''
@@ -68,7 +69,7 @@ async def orm_add_user(
     result = await session.execute(query)
     if result.first() is None:
         session.add(
-            User(user_id=user_id, name=name, sub_id=sub_id, tun_id=tun_id, status=0)
+            User(user_id=user_id, name=name, sub_id=sub_id, tun_id=tun_id, status=0, invited_by=invited_by)
         )
         await session.commit()
 
@@ -129,6 +130,13 @@ async def orm_get_user_by_id(session: AsyncSession, user_id: int):
 async def orm_block_user(session: AsyncSession, user_id: int):
     '''Блокирует пользователя'''
     query = update(User).where(User.id == user_id).values(blocked=True)
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_unblock_user(session: AsyncSession, user_id: int):
+    '''Блокирует пользователя'''
+    query = update(User).where(User.id == user_id).values(blocked=False)
     await session.execute(query)
     await session.commit()
 

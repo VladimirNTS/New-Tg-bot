@@ -2,9 +2,6 @@ aiogram==3.19.0
 sqlalchemy
 python-dotenv
 requests
-numpy
-matplotlib
-gspread
 asyncpg
 aiosqlite
 fastapi
